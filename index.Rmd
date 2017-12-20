@@ -10,7 +10,7 @@ runtime: shiny
 knitr::opts_chunk$set(echo = TRUE)
 require(data.table)
 require(tm)
-require(plotly)
+require(ggplot2)
 require(corrplot)
 ```
 
