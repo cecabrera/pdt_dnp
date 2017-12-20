@@ -1,0 +1,299 @@
+---
+title: "Clasificación de Planes de Desarrollo"
+author: "Camilo Cabrera"
+date: "December 19, 2017"
+output: html_notebook
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(data.table)
+require(tm)
+require(plotly)
+require(corrplot)
+```
+
+Los Planes de Desarrollo Departamentales son los documentos que dan la hoja de ruta de cada Departamento de Colombia durante los 4 años de gobierno que dura cada gobernador electo. Los documentos están disponibles [aquí](/data/). 
+
+Analizarlos simultáneamente es una labor posible gracias al _text analytics_. El objetivo de este blog es organizarlos, clasificarlos y visualizarlos utilizando el lenguaje de programación R. 
+
+Se analizarán los siguientes puntos:
+
+1. Análisis de temas principales en cada PDT.
+2. Clasificar los planes de acuerdo con algún criterio de similitud.
+3. ¿Qué tipo de información reportaría a los evaluadores con el fin de hacer su tarea más
+sencilla?
+
+
+
+Se identifican las fuentes de información seleccionando todos los archivos de la carpeta "data" y guardándolos en una variable llamada `paths`. Esta lista será la ruta para cargar cada Plan de Desarrollo. Los nombres de cada Departamento se almacenarán en la variable `departaments`. 
+
+```{r}
+paths <- list.files(c("data"), pattern="\\.(TXT|txt)$", recursive = TRUE, full.names = TRUE)
+departments <- sub(pattern = ".txt.*", "" , sub(pattern = ".*/", "", paths))
+```
+
+# Preprocesamiento
+
+El preprocesamiento es un componente clave en muchos algoritmos de minado de texto _(text mining)_. El preprocesamiento usualmente se resume en tareas como tokenización, filtrado, lematización y el _stemming_ (u origen de la palabra).
+
+Comenzamos cargando los datos en una sola variable llamada `d`. Son 31 documentos. Esta variable contendrá cada documento en formato de tabla. En cada tabla, las filas representan el orden en el que aparecen las palabras y las columnas contienen las palabras y un `1` para denotar que la palabra aparece una vez. Esta característica servirá a futuro cuando se agrupen las palabras. 
+
+```{r eval=FALSE}
+d <- lapply(paths, function(x){
+  bag = data.table(names(fread(input = x, encoding = "UTF-8")))
+  setnames(x = bag, old = "V1", new = sub(pattern = ".txt.*", "" , sub(pattern = ".*/", "", x)))
+  bag[, f := 1]
+  bag
+})
+names(d) <- departments
+# Almacenamos la variable en memoria para correr el procesamiento una sola vez. 
+saveRDS(d,"chunks/chunk3.rds")
+```
+
+## Tokenización
+
+La tokenización consiste en separar las secuencias de caracteres en pedazos (palabras/frases) llamados tokens y, en el camino, desechar caracteres como puntuaciones. Nuestros documentos ya carecen de puntuaciones. 
+
+# Filtrado
+
+El filtrado usualmente se hace para remover algunas de las palabras. Un filtro común es remover las _stop words_ o palabras que frecuentemente aparecen en el texto y que no contienen mucha información (es decir, preposiciones, conjunciones, etc). Así mismo, las palabras que aparecen con mucha frecuencia en un documento se dice que son de poca utilidad para distinguir otros documentos y también las palabras que aparecen rara vez posiblemente son irrelevantes y pueden ser eliminadas de los documentos. 
+
+En R, el paquete `tm` brinda una lista de las `stop-words` del español. Veamos las primeras 10 y las últimas 10. 
+
+```{r}
+stop_es <- stopwords(kind = "es")
+cbind(head(stop_es, 10), tail(stop_es, 10))
+```
+
+Las suprimimos de todos los documentos:
+
+```{r}
+d <- readRDS("chunks/chunk3.rds")
+d <- lapply(d, function(x){
+  x[!x[[1]] %in% stop_es]
+})
+```
+
+## Lematización
+
+Lematización considera el análisis morfológico de las palabras, es decir, agrupar las diversas formas de una palabra de manera que puedan ser analizadas como un solo término. En otras palabras, los métodos de lematización intentan mapear verbos a su sentido infinitivo y los sustantivos a su forma singular. Para lematizar documentos, es necesario determinar para cada palabra si es un verbo, adjetivo o sustantivo. Dado que este proceso es tedioso y sujeto a errores, en la práctica, se prefieren los métodos de _stemming_. 
+
+## Stemming
+
+Los métodos de _stemming_ le apuntan a encontrar la raíz de las palabras y usarla como método agrupador de palabras. Como es de esperarse, los algoritmos de _stemming_ son dependientes al lenguaje. 
+
+Utilizando el algoritmo de _stemming_ de Porter y tomando como ejemplo las útlimas 30 palabras del Plan de Desarrollo del Huila encontramos las siguientes comparaciones.
+
+```{r}
+tail(d$HUILA[, .(HUILA, stemDocument(x = HUILA,  language = "es"))],30)
+```
+
+La búsqueda del origen de las palabras _(stemming)_ es un procedimiento delicado. En el español, remover las tildes en las palabras cambia el acento y puede entregar una connotación distinta a la palabra de origen: no es lo mismo "hábito" que "habito" que "habitó". A su vez, las raíces agrupan palabras de contexto diferentes: "partido", "parte", "partida" y "partes" conllevan a la misma raíz "part". Para efectos de este trabajo se utilizarán las raíces de las palabras dejando a consideración del lector las implicaciones que esto tiene. 
+
+```{r eval=FALSE}
+d <- lapply(d, function(x){
+  colname <- colnames(x)[1]
+  x[[colname]] <- stemDocument(x[[colname]], language = "es")
+  x
+})
+saveRDS(d, "chunks/chunk7.RDS")
+```
+
+# Modelo de Vectores Espaciales
+
+Se definirá el _vocabulario_ como el conjunto que contiene todas las palabras presentes en todos los documentos. La manera más común de representar a todos los documentos es convirtiéndolos en vectores numéricos. A esta representación se le llama "Modelo de Vectores Espaciales" (VSM) y es utilizada en algoritmos de minado de texto y sistemas de recolección de información; al tiempo que facilita análisis eficientes de grandes colecciones de documentos. 
+
+Colocamos todos los tokens en una misma matriz, se suman las frecuencias de cada palabra en cada documento y se ordenan en orden decreciente.  
+
+```{r warning=FALSE}
+d <- readRDS("chunks/chunk7.RDS")
+d <- lapply(d, function(x){
+  name <- colnames(x)[1]
+  x[, depart := name]
+  setnames(x, old = name, new = "word")
+  x
+})
+d <- rbindlist(d, use.names = T)[, sum(f), keyby = .(depart, word)]
+```
+
+Filtra por los departamentos. Cada departamento resalta las 15 palabras (raíces) más mencionadas. 
+
+```{r echo=FALSE}
+wellPanel(
+  fluidRow(
+    column(4
+      , selectInput("depart1", label = "Selecciona el departamento:",
+      choices = departments, selected = "CASANARE", multiple = F)
+      
+    , renderPlot(
+      ggplot(data = {
+          temp <- head(d[depart %in% input$depart1][order(V1, decreasing = T)], 15)
+          temp$word <- factor(temp$word, levels = rev(unique(temp$word)))
+          temp
+        }, aes(word, V1, fill = depart)
+        ) +
+        geom_col(show.legend = FALSE) +
+        labs(x = NULL, y = "frecuencia") +
+        # facet_wrap(~depart, ncol = 2, scales = "free") +
+        coord_flip() + 
+        scale_fill_manual(values=c("#CC6666", "#9999CC", "#66CC99"))
+    )
+
+    )
+    , column(4
+    , selectInput("depart2", label = "Selecciona el departamento:",
+      choices = departments, selected = "CUNDINAMARCA", multiple = F)
+    , renderPlot(
+      ggplot(data = {
+          temp <- head(d[depart %in% input$depart2][order(V1, decreasing = T)], 15)
+          temp$word <- factor(temp$word, levels = rev(unique(temp$word)))
+          temp
+        }, aes(word, V1, fill = depart)
+        ) +
+        geom_col(show.legend = FALSE) +
+        labs(x = NULL, y = "frecuencia") +
+        # facet_wrap(~depart, ncol = 2, scales = "free") +
+        coord_flip()+
+        scale_fill_manual(values=c("#9999CC"))
+    )
+    )
+    , column(4
+    , selectInput("depart3", label = "Selecciona el departamento:",
+    choices = departments, selected = "ANTIOQUIA", multiple = F)
+    , renderPlot(
+      ggplot(data = {
+          temp <- head(d[depart %in% input$depart3][order(V1, decreasing = T)], 15)
+          temp$word <- factor(temp$word, levels = rev(unique(temp$word)))
+          temp
+        }, aes(word, V1, fill = depart)
+        ) +
+        geom_col(show.legend = FALSE) +
+        labs(x = NULL, y = "frecuencia") +
+        # facet_wrap(~depart, ncol = 2, scales = "free") +
+        coord_flip() + 
+        scale_fill_manual(values=c("#66CC99"))
+    )
+
+    )
+  )
+)
+```
+
+
+En VSM cada palabra es representada por una variable que contienen un valor numérico indicando el peso (importancia) de la palabra en el documento. Se utilizará el modelo de _Term frequency-inverse document frequency_ (TF-IDF). Convertimos la tabla en una matriz de frecuencias
+
+```{r}
+f <- dcast.data.table(d, formula = "word~depart", value.var = "V1", fill = 0)
+str(f)
+```
+
+La variable `f` contiene la frecuencia de con la que aparece la palabra de la fila en el departamento de la columna. Calculamos el término de frecuencia `TF-IDF`.
+
+```{r eval=FALSE}
+tf <- f[,-1,with=FALSE]
+idf <- log((ncol(f)-1)/rowSums(tf))
+q <- tf*idf
+str(q)
+q_melted <- melt.data.table(cbind(word = f$word, q), id.vars = "word", variable.name = "depart", value.name = "V1")
+saveRDS(q_melted, "chunks/q_melted.RDS"); saveRDS(q, "chunks/q.RDS")
+```
+
+```{r echo=FALSE}
+q <- readRDS("chunks/q.RDS")
+q_melted <- readRDS("chunks/q_melted.RDS")
+```
+La variable `q` contiene la frecuencia ponderada por el TF-IDF. La variable `q_melted` es la misma variable `q` reducida en 3 columnas. A continuación las palabras más relevantes de cada departamento luego de ponderar por TF-IDF.
+
+```{r echo=FALSE}
+wellPanel(
+  fluidRow(
+    column(4
+      , selectInput("depart4", label = "Selecciona el departamento:",
+      choices = departments, selected = "CASANARE", multiple = F)
+      
+    , renderPlot(
+      ggplot(data = {
+          temp <- head(q_melted[depart %in% input$depart4][order(V1, decreasing = T)], 15)
+          temp$word <- factor(temp$word, levels = rev(unique(temp$word)))
+          temp
+        }, aes(word, V1, fill = depart)
+        ) +
+        geom_col(show.legend = FALSE) +
+        labs(x = NULL, y = "TF-IDF") +
+        # facet_wrap(~depart, ncol = 2, scales = "free") +
+        coord_flip() + 
+        scale_fill_manual(values=c("#CC6666"))
+    )
+
+    )
+    , column(4
+    , selectInput("depart5", label = "Selecciona el departamento:",
+      choices = departments, selected = "CUNDINAMARCA", multiple = F)
+    , renderPlot(
+      ggplot(data = {
+          temp <- head(d[depart %in% input$depart5][order(V1, decreasing = T)], 15)
+          temp$word <- factor(temp$word, levels = rev(unique(temp$word)))
+          temp
+        }, aes(word, V1, fill = depart)
+        ) +
+        geom_col(show.legend = FALSE) +
+        labs(x = NULL, y = "TF-IDF") +
+        # facet_wrap(~depart, ncol = 2, scales = "free") +
+        coord_flip() + 
+        scale_fill_manual(values=c("#9999CC"))
+    )
+    )
+    , column(4
+    , selectInput("depart6", label = "Selecciona el departamento:",
+    choices = departments, selected = "ANTIOQUIA", multiple = F)
+    , renderPlot(
+      ggplot(data = {
+          temp <- head(d[depart %in% input$depart6][order(V1, decreasing = T)], 15)
+          temp$word <- factor(temp$word, levels = rev(unique(temp$word)))
+          temp
+        }, aes(word, V1, fill = depart)
+        ) +
+        geom_col(show.legend = FALSE) +
+        labs(x = NULL, y = "TF-IDF") +
+        # facet_wrap(~depart, ncol = 2, scales = "free") +
+        coord_flip() + 
+        scale_fill_manual(values=c("#66CC99"))
+    )
+
+    )
+  )
+)
+
+
+```
+
+Las [4 métricas](https://stats.stackexchange.com/questions/289400/quantify-the-similarity-of-bags-of-words) de similaridad más utilidades en la literatura son:
+
+* Jaccard Similarity
+* Cosine Similarity
+* Spearman's rank correlation
+* Pearson chi2 test-based
+
+Según [Kilgarriff (1997)](http://www.aclweb.org/anthology/W/W97/W97-0122.pdf), el test ideal para calcular la similaridad entre dos documentos es el _Pearson chi2 test-based_. Sin embargo, el poder computacional y concepto teórico es significativamente superior a utilizar _Cosine Similarity_ y entregan resultados relativamente similares. El _Cosine Similarity_ ha demostrado en otros experimentos ser mejor que el _Spearman's rank correlation_; aún cuando es una alternativa viable para calcular la similaridad entre documentos. La _Jaccard Similarity_ es la más simple de las similaridades y no tiene en consideración la frecuencia con la que aparecen las palabras. Por esta razón, la similaridad a trabajar será el _Cosine Similarity_.
+
+Cada Plan de Desarrollo se puede representar como un __vector__ de valores. El coseno entre dos vectores determina cuán cercanos (igual a 1) o alejados (igual a -1) están en el plano n-dimensional. El cálculo del coseno es considerado también como el [_coeficiente de correlación no centrado_](https://en.wikipedia.org/wiki/Pearson_correlation_coefficient) entre dos vectores y matemáticamente es similar al coeficiente de correlación de Pearson. Por eso se usará este como medida de la similaridad. 
+
+```{r}
+corrplot(corr = cor(q, method = "pearson"), type = "lower", method = "pie", diag = TRUE, order = "FPC")
+```
+
+La matriz de correlación se ordenó por compomentes principales y por eso aparecen primero los departamentos con mayor correlación y de último los de menos. Se resalta los siguientes insights:
+
+* Quindío y Cundinamarca tienen la mayor similitud (0.903) de palabras en los Planes de Desarrollo. 
+* Casanare es el departamento con mayor diferencias respecto a los demás departamentos.
+* [En Octubre de 2016](http://www.portafolio.co/economia/gobierno/dnp-destaco-los-planes-de-desarrollo-departamentales-501057), el DNP entregó un reconocimiento a las gobernaciones con desarrollo robusto, intermedio y temprano a Antioquia, Nariño y Caquetá, respectivamente. En el correlograma, las tres aparecen seguidas.  
+
+# Referencias
+
+* [A Brief Survey of Text Mining: Classification, Clustering and Extraction Techniques](https://arxiv.org/pdf/1707.02919.pdf)
+* [Text Mining with R](https://www.tidytextmining.com/tfidf.html)
+* [Quantify the similarity of bags of words](https://stats.stackexchange.com/questions/289400/quantify-the-similarity-of-bags-of-words)
+* [Pearson Correlation Coefficient](https://en.wikipedia.org/wiki/Pearson_correlation_coefficient)
+* [DNP destacó los planes de desarrollo departamentales](http://www.portafolio.co/economia/gobierno/dnp-destaco-los-planes-de-desarrollo-departamentales-501057) 
