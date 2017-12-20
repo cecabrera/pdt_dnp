@@ -290,7 +290,7 @@ La matriz de correlación se ordenó por compomentes principales y por eso apare
 
 * Quindío y Cundinamarca tienen la mayor similitud (0.903) de palabras en los Planes de Desarrollo. 
 * Casanare es el departamento con mayor diferencias respecto a los demás departamentos.
-* [En Octubre de 2016](http://www.portafolio.co/economia/gobierno/dnp-destaco-los-planes-de-desarrollo-departamentales-501057), el DNP entregó un reconocimiento a las gobernaciones con desarrollo robusto, intermedio y temprano a Antioquia, Nariño y Caquetá, respectivamente. En el correlograma, estas tres aparecen seguidas.  
+* [En Octubre de 2016](http://www.portafolio.co/economia/gobierno/dnp-destaco-los-planes-de-desarrollo-departamentales-501057), el DNP entregó un reconocimiento a las gobernaciones con desarrollo robusto, intermedio y temprano a Antioquia, Nariño y Caquetá, respectivamente. En el correlograma, estas tres aparecen seguidas infiriendo esta aparente similitud. 
 
 # Clasificación
 
