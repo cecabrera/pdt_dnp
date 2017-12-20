@@ -115,14 +115,12 @@ d <- lapply(d, function(x){
   x
 })
 d <- rbindlist(d, use.names = T)[, sum(f), keyby = .(depart, word)]
-saveRDS(d, "chunks/chunk8.RDS")
 print(d)
 ```
 
 Filtra por los departamentos. Cada departamento resalta las 15 palabras (raíces) más mencionadas. 
 
 ```{r echo=FALSE}
-d <- readRDS("chunks/chunk8.RDS")
 wellPanel(
   fluidRow(
     column(4
