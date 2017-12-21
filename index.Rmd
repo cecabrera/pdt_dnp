@@ -198,7 +198,7 @@ wellPanel(
       choices = departments, selected = "CASANARE", multiple = F)
       
     , renderPlot(
-        ggplot(data = d %>% filter(depart %in% input$depart4) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
+        ggplot(data = q_melted %>% filter(depart %in% input$depart4) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
         geom_col(show.legend = FALSE) +
         labs(x = NULL, y = "TF-IDF") +
         # facet_wrap(~depart, ncol = 2, scales = "free") +
@@ -211,7 +211,7 @@ wellPanel(
     , selectInput("depart5", label = "Selecciona el departamento:",
       choices = departments, selected = "CUNDINAMARCA", multiple = F)
     , renderPlot(
-        ggplot(data = d %>% filter(depart %in% input$depart5) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
+        ggplot(data = q_melted %>% filter(depart %in% input$depart5) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
         geom_col(show.legend = FALSE) +
         labs(x = NULL, y = "TF-IDF") +
         # facet_wrap(~depart, ncol = 2, scales = "free") +
@@ -223,7 +223,7 @@ wellPanel(
     , selectInput("depart6", label = "Selecciona el departamento:",
     choices = departments, selected = "ANTIOQUIA", multiple = F)
     , renderPlot(
-        ggplot(data = d %>% filter(depart %in% input$depart6) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
+        ggplot(data = q_melted %>% filter(depart %in% input$depart6) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
         geom_col(show.legend = FALSE) +
         labs(x = NULL, y = "TF-IDF") +
         # facet_wrap(~depart, ncol = 2, scales = "free") +
@@ -270,15 +270,15 @@ Si cada documento hiciese parte de una categoría _a priori_, se utilizarían al
 
 Un caso podría ser categorizar los documentos por región del país, tomar los Planes de Desarrollo Municipales y tratar de clasificar si las palabras usadas en los Municipios están correlacionadas (son similares) a las palabras usandas en los Departamentos. 
 
-En vista que la clasificación se hará _a posteriori_, se utilizarán algoritmos de _clustering_ o conglomerados. En Analítica de Texto existen:
+En vista que la clasificación se hará _a posteriori_, se utilizarán algoritmos de _clustering_ o conglomerados. En Analítica de Texto algunos son:
 
 1. Algortimos de Conglomerados Herárquicos. 
 2. Conglomerado k-medias
 3. Conglomerados probabilísticos y Modelos de Tópicos
 
-Los algoritmos de conglomerados herásquicos están basados en distancias. Utilizan una función de similaridad para medir cuán cerca está un documento de otro. Es posible contruirlos en de arriba-a-abajo (colocando cada documento en un grupo) o de abajo-a-arriba (colocando todos los documentos en un grupo). Los algoritmos de k-medias ubican un centroide por cada grupo y conglomera cada documento respecto a cada centroide. Es ampliamente utilizado en problemas de datos estructurados. El cálculo del número óptimo de grupos (k) es considerado _NP-Hard_ dados los requerimientos computacionales para calcularlo. 
+Los algoritmos de conglomerados herárquicos están basados en distancias. Utilizan una función de similaridad para medir cuán cerca está un documento de otro. Es posible contruirlos de arriba-a-abajo (colocando cada documento en un grupo) o de abajo-a-arriba (colocando todos los documentos en un grupo). Los algoritmos de k-medias ubican un centroide por cada grupo y conglomera cada documento respecto a cada centroide. Es ampliamente utilizado en problemas de datos estructurados. El cálculo del número óptimo de grupos (k) es considerado _NP-Hard_ dados los requerimientos computacionales para calcularlo. 
 
-La mayor implicación en los algoritmos anteriores es que a cada "observación" (en nuestro caso "palabra") le asigna una única categoría. Sin embargo, existen palabras que podrían hacer parte de varias categorías (o "tópicos"). Por eso, el modelaje de tópicos será el escogido para clasificar los Planes de Desarrollo Departamentales.
+La mayor implicación en los algoritmos anteriores es que a cada "observación" (en nuestro caso "palabra") es asignado a una única categoría. Sin embargo, existen palabras que podrían hacer parte de varias categorías (o "tópicos"). Por eso, el modelaje de tópicos será el escogido para clasificar los Planes de Desarrollo Departamentales.
 
 # Modelaje de tópicos
 
@@ -372,12 +372,12 @@ beta_spread2 %>%
 ap_documents <- tidy(ap_lda2, matrix = "gamma")
 print(ap_documents)
 
-plot_ly(data = {
-  
-          temp <- as.data.table(ap_documents)[topic %in% "1"][order(gamma)]
-          
-}
-        , x = ~document, y = ~gamma, type = "bar")
+# plot_ly(data = {
+#   
+#           temp <- as.data.table(ap_documents)[topic %in% "1"][order(gamma)]
+#           
+# }
+#         , x = ~document, y = ~gamma, type = "bar")
 ```
 
 # Referencias
@@ -392,13 +392,3 @@ plot_ly(data = {
 # Código fuente
 
 Código fuente disponible en [Github](https://github.com/cecabrera/pdt_dnp).
-
-```{r}
-
-
-
-tid(yAssociatedPress) %>%
-  filter(document == 6) %>%
-  arrange(desc(count))
-
-```
