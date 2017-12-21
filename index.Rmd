@@ -377,7 +377,7 @@ Las palabras más comunes en el tópico 2 son: "formacion", "fisic", "conserv", 
 
 # Probabilidades documento-tópico
 
-Además de estimar cada tópico como una mezcla de palabras, LDA también modelo cada documento como una mezcla de tópicos. En el modelo, el estimador de estas probabilidades es llamado γ (“gamma”):
+Además de estimar cada tópico como una mezcla de palabras, LDA también modela cada documento como una mezcla de tópicos. En el modelo, el estimador de estas probabilidades es llamado "gamma" (γ):
 
 ```{r}
 ap_documents <- tidy(ap_lda, matrix = "gamma")
@@ -404,11 +404,13 @@ head(depart[order(`2`, decreasing = T)], 6)
 
 Los PDTs que mejor describen el tópico 2 son Cesar, Valle del Cauca, Chocó, Cauca, Amazonas y Magdalena. Al igual que en el tópico 1, hay relativa gran diferencia entre el primero (Cesar con 76.9%) y los demás (Valle del Cauca con 56.9% y Chocó con 56.7%). También se resalta que Valle del Cauca, Chocó y Cauca tengan esa cercanía en este tópico cuando geográficamente son vecinos; infiriendo que usan los mismos términos en sus documentos. Cesar por su lado resalta las palabras "deeducacionsecretari" y "dedeportesecretari". 
 
-# Apuntes y recomendaciones
+# Apuntes
 
 La hipótesis resultante del análisis LDA es que el tópico 1 tiene mayor énfasis en proyectos relacionados a la salud y el tópico 2 hacia proyecto de sociales de índole educacional y cultural. Aún cuando resalta palabras pegadas, la frecuencia con la que aparecen y su relevancia latente en comparación con los demás documentos hace que el modelo las tenga en cuenta. Esta hipótesis está sujeta a cambios por la calidad en los datos (palabras unidas). 
 
-Los ganadores del premio del DNP: Antioquia, Caquetá y Nariño tuvieron una distribución equitativa entre ambos tópicos lo que infiere un balance entre las necesidades en salud, educación y cultura de sus departamentos. Dicho balance podría estar asociado con su éxito.
+Los ganadores del premio del DNP: Antioquia, Caquetá y Nariño tuvieron una distribución equitativa entre ambos tópicos (aprox. 50% en cada tópico) lo que infiere un balance entre las necesidades en salud, educación y cultura de sus departamentos. Dicho balance podría estar asociado con su éxito.
+
+# Recomendaciones
 
 1. El hecho que todos los PDT hayan tenido una correlación relativamente alta entre si (superior al 60%), enciende las alarmas de por qué Casanare es el más alejado. Este Departamento rico en petróleo atraviesa [crisis sociales](http://www.colombiainforma.info/la-crisis-que-deja-el-petroleo-en-casanare/) (en especial en salud) y [escándalos de corrupción](https://www.youtube.com/watch?v=UibMVMbO9Jk). Una recomendación sería investigar si este Plan de Desarrollo contiene lineamientos que expliquen los problemas de corrupción o si es necesario rechazar esta hipótesis debido a la calidad de datos disponible.
 2. La significativa diferencia de palabras de César respecto a los demás documentos resalta una investigación más detalla a ese PDT. 
