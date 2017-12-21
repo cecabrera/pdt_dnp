@@ -41,7 +41,7 @@ Para comenzar, se almacena las rutas de los archivos de texto en una variable ll
 ```{r}
 paths <- list.files(c("data"), pattern="\\.(TXT|txt)$", recursive = TRUE, full.names = TRUE)
 departments <- sub(pattern = ".txt.*", "" , sub(pattern = ".*/", "", paths))
-print(head(paths, 5)) # Visualizar los primeros 5 elementos de la variable `paths`
+print(head(paths, 6)) # Visualizar los primeros 5 elementos de la variable `paths`
 ```
 
 ## Preprocesamiento
@@ -208,7 +208,6 @@ wellPanel(
     column(4
       , selectInput("depart4", label = "Selecciona el departamento:",
       choices = departments, selected = "CASANARE", multiple = F)
-      
     , renderPlot(
         ggplot(data = q_melted %>% filter(depart %in% input$depart4) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
         geom_col(show.legend = FALSE) +
@@ -235,6 +234,7 @@ wellPanel(
     , selectInput("depart6", label = "Selecciona el departamento:",
     choices = departments, selected = "ANTIOQUIA", multiple = F)
     , renderPlot(
+      
         ggplot(data = q_melted %>% filter(depart %in% input$depart6) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
         geom_col(show.legend = FALSE) +
         labs(x = NULL, y = "TF-IDF") +
