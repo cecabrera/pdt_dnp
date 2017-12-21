@@ -185,19 +185,19 @@ str(f)
 
 La variable `f` contiene la frecuencia con la que aparece cada palabra para cada departamento. Se calcula el término de frecuencia `TF-IDF`:
 
-```{r eval=FALSE}
+```{r weights, eval=FALSE}
 tf <- f[,-1,with=FALSE]
 idf <- log((ncol(f)-1)/rowSums(tf))
 q <- tf*idf
 str(q)
 q_melted <- melt.data.table(cbind(word = f$word, q), id.vars = "word", variable.name = "depart", value.name = "V1")
-saveRDS(q_melted, "chunks/q_melted.RDS"); saveRDS(q, "chunks/q.RDS")
 ```
 
 ```{r echo=FALSE}
-q <- readRDS("chunks/q.RDS")
-q_melted <- readRDS("chunks/q_melted.RDS")
+q <- readRDS("chunks/weights_q.RDS")
+q_melted <- readRDS("chunks/weights_q_melted.RDS")
 ```
+
 La variable `q` contiene la frecuencia ponderada por el TF-IDF. La variable `q_melted` es la misma variable `q` reducida en 3 columnas. A continuación las palabras más relevantes de cada departamento luego de ponderar por TF-IDF.
 
 ```{r echo=FALSE}
