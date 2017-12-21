@@ -162,7 +162,7 @@ wellPanel(
     )
     , column(4
     , selectInput("depart2", label = "Selecciona el departamento:",
-      choices = departments, selected = "CUNDINAMARCA", multiple = F)
+      choices = departments, selected = "ANTIOQUIA", multiple = F)
     , renderPlot(
         ggplot(data = d %>% filter(depart %in% input$depart2) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
         geom_col(show.legend = FALSE) +
@@ -174,7 +174,7 @@ wellPanel(
     )
     , column(4
     , selectInput("depart3", label = "Selecciona el departamento:",
-    choices = departments, selected = "ANTIOQUIA", multiple = F)
+    choices = departments, selected = "CESAR", multiple = F)
     , renderPlot(
         ggplot(data = d %>% filter(depart %in% input$depart3) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
         geom_col(show.legend = FALSE) +
@@ -231,7 +231,7 @@ wellPanel(
     )
     , column(4
     , selectInput("depart5", label = "Selecciona el departamento:",
-      choices = departments, selected = "CUNDINAMARCA", multiple = F)
+      choices = departments, selected = "ANTIOQUIA", multiple = F)
     , renderPlot(
         ggplot(data = q_melted %>% filter(depart %in% input$depart5) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
         geom_col(show.legend = FALSE) +
@@ -243,7 +243,7 @@ wellPanel(
     )
     , column(4
     , selectInput("depart6", label = "Selecciona el departamento:",
-    choices = departments, selected = "ANTIOQUIA", multiple = F)
+    choices = departments, selected = "CESAR", multiple = F)
     , renderPlot(
       
         ggplot(data = q_melted %>% filter(depart %in% input$depart6) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
@@ -334,7 +334,7 @@ ap_topics <- tidy(ap_lda, matrix = "beta")
 print(ap_topics)
 ```
 
-Este procedimiento convirtió el modelo a un formato de una fila por tópico por palabra. Para cada combinación, el modelo computa la probabilidad que ese término haya sido generado por ese tópico. Por ejemplo, el término "abandon" tiene una probabilidad de 1.71e-04 de haber sido generado del tópico 1 y una del 2.28x-05 de haber sido generado del tópico 2. 
+Este procedimiento convirtió el modelo a un formato de una fila por tópico por palabra. Para cada combinación, el modelo computa la probabilidad que ese término haya sido generado por ese tópico. Por ejemplo, el término "abandon" tiene una probabilidad de 1.71e-04 de haber sido generado del tópico 1 y una del 3.28x-05 de haber sido generado del tópico 2. 
 
 Para cada tópico, se ordenará por mayor probabilidad que la palabra haya sido generada por ese tópico. 
 
@@ -375,24 +375,43 @@ beta_spread %>%
 
 Las palabras más comunes en el tópico 2 son: "formacion", "fisic", "conserv", "natural", "direccion", "comunitari", "desplaz", "orden", "potencial", "coordin", "asistent" quizás infiendo soluciones a problemáticas sociales (comunitari, coordin, formacion) y de desplazamiento (fisic, orden, direccion). En el tópico 1 están las palabras "violenci", "viviend", "trabaj", "cultur", "climat", "urban", "saneamient", "tecnolog", "promocion", "interes", "document" posiblemente abordando más temáticas de salud (urban, violenc, climat, saneamient) y convivencia (cultur, trabaj, viviend, tecnolog). 
 
-# Document-topic probabilities
+# Probabilidades documento-tópico
+
+Además de estimar cada tópico como una mezcla de palabras, LDA también modelo cada documento como una mezcla de tópicos. En el modelo, el estimador de estas probabilidades es llamado γ (“gamma”):
 
 ```{r}
 ap_documents <- tidy(ap_lda, matrix = "gamma")
-print(ap_documents)
-
-# plot_ly(data = {
-#   
-#           temp <- as.data.table(ap_documents)[topic %in% "1"][order(gamma)]
-#           
-# }
-#         , x = ~document, y = ~gamma, type = "bar")
+ap_documents$gamma <- round(ap_documents$gamma*100, 1)
+depart <- dcast.data.table(data = as.data.table(ap_documents), formula = "document ~ topic", value.var = "gamma")
+print(depart)
 ```
 
-# Recomendaciones
+Cada uno de estos valores es una proporción estimada de palabras que vienen de ese documento que son generadas por ese tópico. Por ejemplo, el modelo estima que el 76.9% de las palabras del PDT de Cesar construyen el tópico 2 mientras que el 73.1% del PDT de Casanare conforman el tópico 1.
 
-1. El hecho que todos los PDT hayan tenido una correlación relativamente alta entre si (superior al 60%), enciende las alarmas de por qué Casanare es el más alejado. Este Departamento rico en petróleo atraviesa [crisis sociales](http://www.colombiainforma.info/la-crisis-que-deja-el-petroleo-en-casanare/) y [escándalos de corrupción](https://www.youtube.com/watch?v=UibMVMbO9Jk). Una hipótesis posible sería investigar si este Plan de Desarrollo contiene lineamientos que expliquen la corrupción o rechazar esta hipótesis debido a la calidad de datos disponible. 
-2. 
+#### Tópico 1: Proyecto de salud
+
+```{r}
+head(depart[order(`1`, decreasing = T)], 6)
+```
+
+Los PDTs que mejor describen el tópico 1 son Casanare, Vaupés, Huila, Risaralda, Córdoba y Sucre. Resalta la diferencia que existe entre Casanare con un 73.1% respecto a Vaupés (66.6%), Huila (63.9%). Cuando se retorna a la vista por PDT ponderado por TF-IDF, Casanare resalta de nuevo las palabras "saludsector" y "comunitarioprogram" e infiere una conexión de este tópico con salud. 
+
+#### Tópico 2: Educación y Cultura
+
+```{r}
+head(depart[order(`2`, decreasing = T)], 6)
+```
+
+Los PDTs que mejor describen el tópico 2 son Cesar, Valle del Cauca, Chocó, Cauca, Amazonas y Magdalena. Al igual que en el tópico 1, hay relativa gran diferencia entre el primero (Cesar con 76.9%) y los demás (Valle del Cauca con 56.9% y Chocó con 56.7%). También se resalta que Valle del Cauca, Chocó y Cauca tengan esa cercanía en este tópico cuando geográficamente son vecinos; infiriendo que usan los mismos términos en sus documentos. Cesar por su lado resalta las palabras "deeducacionsecretari" y "dedeportesecretari". 
+
+# Apuntes y recomendaciones
+
+La hipótesis resultante del análisis LDA es que el tópico 1 tiene mayor énfasis en proyectos relacionados a la salud y el tópico 2 hacia proyecto de sociales de índole educacional y cultural. Aún cuando resalta palabras pegadas, la frecuencia con la que aparecen y su relevancia latente en comparación con los demás documentos hace que el modelo las tenga en cuenta. Esta hipótesis está sujeta a cambios por la calidad en los datos (palabras unidas). 
+
+Los ganadores del premio del DNP: Antioquia, Caquetá y Nariño tuvieron una distribución equitativa entre ambos tópicos lo que infiere un balance entre las necesidades en salud, educación y cultura de sus departamentos. Dicho balance podría estar asociado con su éxito.
+
+1. El hecho que todos los PDT hayan tenido una correlación relativamente alta entre si (superior al 60%), enciende las alarmas de por qué Casanare es el más alejado. Este Departamento rico en petróleo atraviesa [crisis sociales](http://www.colombiainforma.info/la-crisis-que-deja-el-petroleo-en-casanare/) (en especial en salud) y [escándalos de corrupción](https://www.youtube.com/watch?v=UibMVMbO9Jk). Una recomendación sería investigar si este Plan de Desarrollo contiene lineamientos que expliquen los problemas de corrupción o si es necesario rechazar esta hipótesis debido a la calidad de datos disponible.
+2. La significativa diferencia de palabras de César respecto a los demás documentos resalta una investigación más detalla a ese PDT. 
 
 # Referencias
 
@@ -402,5 +421,3 @@ print(ap_documents)
 * [Pearson Correlation Coefficient](https://en.wikipedia.org/wiki/Pearson_correlation_coefficient)
 * [DNP destacó los planes de desarrollo departamentales](http://www.portafolio.co/economia/gobierno/dnp-destaco-los-planes-de-desarrollo-departamentales-501057) 
 * [Text Mining with R](https://www.tidytextmining.com/topicmodeling.html)
-
-
