@@ -356,13 +356,7 @@ ap_top_terms %>%
 
 Esta gráfica permite entender los dos tópicos que fueron extraidos de los PDTs. Las palabras más comunes en el tópico 1 incluyen "población", "salud", "implementar", "proces", "indic" lo que puede sugerir que están más enfocados a la implementación de proyectos de salud. Aquellas palabras más comunes en el tópico 2 incluyen "social", "econom", "derech", "genero" y "niñ" queriendo inferir una inclinación hacia estrategias de interacción social (niñez, género, derecho) ajenas a la salud. Aquí se resalta una ventaja del modelaje de tópicos opuesta a los métodos de "conglomerados duros": lo tópicos en lenguaje natural se podrían superponer en términos de palabras. 
 
-Como una alternativa, se podría considerar palabras que tuvieron la mayor diferencia de betas (β) entre tópico 1 y tópico 2. Esta se puede estimar usando el logaritmo del radio entre ambos parámetros:
-
-2
-β2  being twice as large leads to a log ratio of 1, while  
-β
-1
-β1  being twice as large results in -1). To constrain it to a set of especially relevant words, we can filter for relatively common words, such as those that have a β  greater than 1/1000 in at least one topic.
+Como una alternativa, se podría considerar palabras que tuvieron la mayor diferencia de betas (β) entre tópico 1 y tópico 2. Esta se puede estimar usando el logaritmo del radio entre ambos parámetros. Para limitarlo a un grupo de palabras especialmente relevantes, se filtra por las palabras comunes, como aquellas que tienen una probabilidad (beta) mayor a (1/1000) en al menor un tópico. A continuación las palabras con las mayores diferencias entre los dos tópicos. 
 
 ```{r}
 beta_spread <- ap_topics %>%
@@ -378,6 +372,8 @@ beta_spread %>%
   geom_col(show.legend = FALSE) + 
   coord_flip()
 ```
+
+Las palabras más comunes en el tópico 2 son: "formacion", "fisic", "conserv", "natural", "direccion", "comunitari", "desplaz", "orden", "potencial", "coordin", "asistent" quizás infiendo soluciones a problemáticas sociales (comunitari, coordin, formacion) y de desplazamiento (fisic, orden, direccion). En el tópico 1 están las palabras "violenci", "viviend", "trabaj", "cultur", "climat", "urban", "saneamient", "tecnolog", "promocion", "interes", "document" posiblemente abordando más temáticas de salud (urban, violenc, climat, saneamient) y convivencia (cultur, trabaj, viviend, tecnolog). 
 
 # Document-topic probabilities
 
