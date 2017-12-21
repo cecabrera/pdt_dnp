@@ -23,7 +23,7 @@ Analizar tal cantidad de datos (31 documentos y 59004 palabras) simultáneamente
 
 Los paquetes de R necesarios para este análisis serán:
 
-```{r}
+```{r, warning=FALSE}
 require(shiny)
 require(data.table)
 require(tm)
@@ -59,6 +59,9 @@ d <- lapply(paths, function(x){
 })
 names(d) <- departments
 ```
+```{r echo=FALSE, eval=FALSE}
+saveRDS(d, "chunks/read.RDS")
+```
 
 ### Tokenización
 
@@ -68,19 +71,25 @@ La tokenización consiste en separar las secuencias de caracteres en pedazos (pa
 
 Un filtro común es remover las _stop words_ o palabras que frecuentemente aparecen en el texto y que no aportan información: preposiciones y conjunciones, por citar algunas. En R, el paquete `tm` brinda una lista de 308 `stop-words` del español. Así mismo, hay palabras que aparecen con mucha frecuencia y que son irrelevantes como "ee", "nn", "oo", "aa", etc. También serán filtradas. 
 
- A continuación las primeras 50. 
+A continuación las primeras 50. 
 
-```{r}
-stop_es <- c(stopwords(kind = "es"), "ee", "nn", "oo", "aa", "dd", "rr", "cc", "pp", "tt", "yy", "zz", "xx")
+``` {r}
+stop_es <- c(stopwords(kind = "es"), "ee", "nn", "oo", "aa", "aaa", "dd", "rr", "cc", "pp", "tt", "yy", "zz", "xx", "aafront", "aai", "aati", "aatis", "ddee", "aaí")
 print(matrix(stop_es[1:50], nrow = 10, byrow = TRUE))
 ```
 
 Las suprimimos de todos los documentos:
 
+```{r echo=FALSE, eval=FALSE}
+d <- readRDS("chunks/read.RDS")
+```
 ```{r filter, eval=FALSE}
 d <- lapply(d, function(x){
   x[!x[[1]] %in% stop_es]
 })
+```
+```{r echo=FALSE, eval=FALSE}
+saveRDS(d, "chunks/filter.RDS")
 ```
 
 ### Lematización
@@ -93,8 +102,11 @@ Los métodos de _stemming_ le apuntan a encontrar la raíz de las palabras y usa
 
 Utilizando el algoritmo de _stemming_ de Porter y tomando como ejemplo las 30 palabras más mencionadas del Plan de Desarrollo del Huila encontramos las siguientes comparaciones. 
 
-```{r}
+```{r echo=FALSE, eval=TRUE}
 d <- readRDS("chunks/filter.RDS")
+```
+
+```{r}
 print(d$HUILA[, .N, keyby = HUILA][order(N, decreasing = T)][1:30,.(HUILA, stemDocument(x = HUILA,  language = "es"), N)])
 ```
 
@@ -107,6 +119,9 @@ d <- lapply(d, function(x){
   x
 })
 ```
+```{r echo=FALSE, eval=FALSE}
+saveRDS(d, "chunks/stemm.RDS")
+```
 
 # Análisis Univariado
 
@@ -116,7 +131,7 @@ Se definirá el _vocabulario_ como el conjunto que contiene todas las palabras p
 
 Colocamos todos los tokens en una misma matriz, se suman las frecuencias de cada palabra en cada documento y se ordenan en orden decreciente.  
 
-```{r frequencies}
+```{r frequencies, warning=FALSE}
 d <- readRDS("chunks/stemm.RDS")
 d <- lapply(d, function(x){
   name <- colnames(x)[1]
@@ -125,7 +140,7 @@ d <- lapply(d, function(x){
   x
 })
 d <- rbindlist(d, use.names = T)[, sum(f), keyby = .(depart, word)]
-print(d)
+print(d[order(V1, decreasing = T)])
 ```
 
 Filtra por los departamentos. Cada departamento resalta las 15 palabras (raíces) más mencionadas en cada Plan de Desarrollo. 
@@ -174,10 +189,6 @@ wellPanel(
 )
 ```
 
-En los documentos está el reto de lidiar con las palabras pegadas. Por ejemplo, en Casanare hay palabras como "culturaprogram", "comunitarioprogram", "deportivosector" y "firmesector". En Arauca sucede algo similar: "propiosotr" haciendo alución a "propios otros" y "físicasecret" haciendo alución a "física secreto". Estas inconsistencias podrían dificultar la comparación entre documentos. 
-
-En el Meta está de primero la palabra "guaro". Indagando en el documento se encontró que hay un municipio llamado "San Carlos de Guaroa" y el algoritmo luego de hacer el _stemm_ suprimió la "a" al final de "Guaroa". Este municipio tiene relevancia por las intenciones del departamento en aportar a sus necesidades sociales y económicas; y no tiene nada que ver con una política hacia el aguardiente. 
-
 En VSM cada palabra es representada por un valor numérico que indica el peso (importancia) de la palabra en el documento. Se utilizará el modelo de _Term frequency-inverse document frequency_ (TF-IDF) para ponderar. Se moldea la tabla en una matriz de frecuencia:
 
 ```{r}
@@ -200,7 +211,7 @@ q <- readRDS("chunks/weight_q.RDS")
 q_melted <- readRDS("chunks/weight_q_melted.RDS")
 ```
 
-La variable `q` contiene la frecuencia ponderada por el TF-IDF. La variable `q_melted` es la misma variable `q` reducida en 3 columnas. A continuación las palabras más relevantes de cada departamento luego de ponderar por TF-IDF.
+La variable `q` contiene la frecuencia ponderada por el TF-IDF. La variable `q_melted` es la misma variable `q` reducida a 3 columnas. A continuación las palabras más relevantes de cada departamento luego de ponderar por TF-IDF.
 
 ```{r echo=FALSE}
 wellPanel(
@@ -250,6 +261,10 @@ wellPanel(
 
 ```
 
+En los documentos está el reto de lidiar con las palabras pegadas. Por ejemplo, en Casanare hay palabras como "culturaprogram", "comunitarioprogram", "deportivosector" y "firmesector". En Arauca sucede algo similar: "propiosotr" haciendo alución a "propios otros" y "físicasecret" haciendo alución a "física secreto". Estas inconsistencias podrían comprometer la calidad de análisis entre documentos. 
+
+En el Meta está de primero la palabra "guaro". Indagando en el documento se encontró que hay un municipio llamado "San Carlos de Guaroa" y el algoritmo luego de hacer el _stemm_ suprimió la "a" al final de "Guaroa". Este municipio tiene relevancia por las intenciones del departamento en aportar a sus necesidades sociales y económicas; y no tiene nada que ver con una política hacia el aguardiente. 
+
 # Análisis Multivariado
 
 ## Algoritmos de similaridad
@@ -263,7 +278,7 @@ Las [4 métricas](https://stats.stackexchange.com/questions/289400/quantify-the-
 
 Según [Kilgarriff (1997)](http://www.aclweb.org/anthology/W/W97/W97-0122.pdf), el test ideal para calcular la similaridad entre dos documentos es el _Pearson chi2 test-based_. Sin embargo, el poder computacional y concepto teórico es significativamente superior a utilizar _Cosine Similarity_ y entregan resultados relativamente similares. El _Cosine Similarity_ ha demostrado en otros experimentos ser mejor que el _Spearman's rank correlation_; aún cuando es una alternativa viable para calcular la similaridad entre documentos. La _Jaccard Similarity_ es la más simple de las similaridades y no tiene en consideración la frecuencia con la que aparecen las palabras. Por esta razón, la similaridad a trabajar será el _Cosine Similarity_.
 
-## Correlación
+### Correlación
 
 Cada Plan de Desarrollo se puede representar como un __vector__ de valores. El coseno entre dos vectores determina cuán cercanos (igual a 1) o alejados (igual a -1) están en el plano n-dimensional. El cálculo del coseno es considerado también como el [_coeficiente de correlación no centrado_](https://en.wikipedia.org/wiki/Pearson_correlation_coefficient) entre dos vectores y matemáticamente es similar al coeficiente de correlación de Pearson. Por eso se usará este como medida de la similaridad. 
 
@@ -296,17 +311,11 @@ En vista que la clasificación se hará _a posteriori_, se utilizarán algoritmo
 
 Los algoritmos de conglomerados herárquicos están basados en distancias respecto a cada vector. Utilizan una función de similaridad para medir cuán cerca está un documento de otro. Es posible contruirlos de arriba-a-abajo (colocando cada documento en un grupo) o de abajo-a-arriba (colocando todos los documentos en un grupo). Los algoritmos de k-medias ubican un centroide por cada grupo y conglomera cada documento respecto a su cercanía a un centroide. Es ampliamente utilizado en problemas de datos estructurados. El cálculo del número óptimo de grupos (k) es considerado _NP-Hard_ dados los requerimientos computacionales para calcularlo y por eso existen heurísticas para hallar un óptimo local. 
 
-La mayor implicación en los algoritmos anteriores es que a cada "observación" (en nuestro caso "palabra") es asignado a una única categoría. Sin embargo, como sucede en el lenguaje natural, existen palabras que podrían hacer parte de varias categorías (o tópicos/temas). Por eso, el modelaje de tópicos será el escogido para clasificar los Planes de Desarrollo Departamentales.
-
-### Modelaje de tópicos
-
-El modelaje de tópicos es un método de clasificación no-supervisada utilizado para encuentrar grupos naturales de palabras que aparentemente no tienen relación. 
+La mayor implicación en los algoritmos anteriores es que a cada "observación" (en nuestro caso "palabra") es asignado a una única categoría. Sin embargo, como sucede en el lenguaje natural, existen palabras que podrían hacer parte de varias categorías (o tópicos/temas). Por eso, el modelaje de tópicos será el escogido para clasificar los Planes de Desarrollo Departamentales. El modelaje de tópicos es un método de clasificación no-supervisada utilizado para encontrar grupos naturales de palabras que aparentemente no tienen relación. 
 
 ### Asignación de Dirichlet Latente
 
-La Alocación de Dirichlet Latente (LDA) es particularmente popular para encajar un modelo de tópicos. Toma cada documento como una mezcla de tópicos, y a cada tópcio como una mezcla de palabras. Esto permite que una palabra pueda hacer parte de varios tópicos.
-
-Matemáticamente, este método estima simultáneamente la mezcla de palabras que están asociadas con cada tópico, al tiempo que identifica la mezcla de tópicos que describen cada documento.
+La Asignación de Dirichlet Latente (LDA) es particularmente popular para encajar un modelo de tópicos. Toma cada documento como una mezcla de tópicos, y a cada tópico como una mezcla de palabras. Esto permite que una palabra pueda hacer parte de varios tópicos. Matemáticamente, este método estima simultáneamente la mezcla de palabras que están asociadas con cada tópico, al tiempo que identifica la mezcla de tópicos que describen cada documento.
 
 Se convierte la variable a un formato apto para realizar el cálculo del LDA. Se analizarán 2 tópicos potenciales para entender el contenido de palabras en cada uno. 
 
@@ -314,29 +323,29 @@ Se convierte la variable a un formato apto para realizar el cálculo del LDA. Se
 doc <- cast_dtm(data = d, document = depart, term = word, value = V1, weighting = tm::weightTf)
 print(doc)
 
-ap_lda2 <- LDA(doc, k = 2, control = list(seed = 1234))
-print(ap_lda2)
+ap_lda <- LDA(doc, k = 2, control = list(seed = 1234))
+print(ap_lda)
 ```
 
-Se extrae las probabilidades o β (“betas”) del modelo por tópico por palabra.
+Se comenzará con el análisis por-tópico-por-palabra extrayendo las probabilidades o β (“betas”) del modelo. 
 
 ```{r}
-ap_topics2 <- tidy(ap_lda2, matrix = "beta")
-print(ap_topics2)
+ap_topics <- tidy(ap_lda, matrix = "beta")
+print(ap_topics)
 ```
 
-Notice that this has turned the model into a one-topic-per-term-per-row format. For each combination, the model computes the probability of that term being generated from that topic. For example, the term “aaron” has a  
-1.686917×10−12 1.686917×10−12  probability of being generated from topic 1, but a  3.8959408×10−
-53.8959408×10−5 probability of being generated from topic 2.
+Este procedimiento convirtió el modelo a un formato de una fila por tópico por palabra. Para cada combinación, el modelo computa la probabilidad que ese término haya sido generado por ese tópico. Por ejemplo, el término "abandon" tiene una probabilidad de 1.71e-04 de haber sido generado del tópico 1 y una del 2.28x-05 de haber sido generado del tópico 2. 
+
+Para cada tópico, se ordenará por mayor probabilidad que la palabra haya sido generada por ese tópico. 
 
 ```{r}
-ap_top_terms2 <- ap_topics2 %>%
+ap_top_terms <- ap_topics %>%
   group_by(topic) %>%
   top_n(15, beta) %>%
   ungroup() %>%
   arrange(topic, -beta)
 
-ap_top_terms2 %>%
+ap_top_terms %>%
   mutate(term = reorder(term, beta)) %>%
   ggplot(aes(term, beta, fill = factor(topic))) +
   geom_col(show.legend = FALSE) +
@@ -345,22 +354,10 @@ ap_top_terms2 %>%
 
 ```
 
+Esta gráfica permite entender los dos tópicos que fueron extraidos de los PDTs. Las palabras más comunes en el tópico 1 incluyen "población", "salud", "implementar", "proces", "indic" lo que puede sugerir que están más enfocados a la implementación de proyectos de salud. Aquellas palabras más comunes en el tópico 2 incluyen "social", "econom", "derech", "genero" y "niñ" queriendo inferir una inclinación hacia estrategias de interacción social (niñez, género, derecho) ajenas a la salud. Aquí se resalta una ventaja del modelaje de tópicos opuesta a los métodos de "conglomerados duros": lo tópicos en lenguaje natural se podrían superponer en términos de palabras. 
 
-This visualization lets us understand the two topics that were extracted from the articles. The most common words in topic 1 include “percent”, “million”, “billion”, and “company”, which suggests it may represent business or financial news. Those most common in topic 2 include “president”, “government”, and “soviet”, suggeting that this topic represents political news. One important observation about the words in each topic is that some words, such as “new” and “people”, are common within both topics. This is an advantage of topic modeling as opposed to “hard clustering” methods: topics used in natural language could have some overlap in terms of words.
+Como una alternativa, se podría considerar palabras que tuvieron la mayor diferencia de betas (β) entre tópico 1 y tópico 2. Esta se puede estimar usando el logaritmo del radio entre ambos parámetros:
 
-As an alternative, we could consider the terms that had the greatest difference in  
-β
-β  between topic 1 and topic 2. This can be estimated based on the log ratio of the two:  
-log
-2
-(
-β
-2
-β
-1
-)
-log2a(β2β1)  (a log ratio is useful because it makes the difference symmetrical:  
-β
 2
 β2  being twice as large leads to a log ratio of 1, while  
 β
@@ -368,13 +365,13 @@ log2a(β2β1)  (a log ratio is useful because it makes the difference symmetrica
 β1  being twice as large results in -1). To constrain it to a set of especially relevant words, we can filter for relatively common words, such as those that have a β  greater than 1/1000 in at least one topic.
 
 ```{r}
-beta_spread2 <- ap_topics2 %>%
+beta_spread <- ap_topics %>%
   mutate(topic = paste0("topic", topic)) %>%
   spread(topic, beta) %>%
   filter(topic1 > .001 | topic2 > .001) %>%
   mutate(log_ratio = log2(topic2 / topic1))
 
-beta_spread2 %>%
+beta_spread %>%
   mutate(term = reorder(term, log_ratio)) %>%
   filter(abs(log_ratio) > 4) %>%
   ggplot(aes(term, log_ratio)) +
@@ -385,7 +382,7 @@ beta_spread2 %>%
 # Document-topic probabilities
 
 ```{r}
-ap_documents <- tidy(ap_lda2, matrix = "gamma")
+ap_documents <- tidy(ap_lda, matrix = "gamma")
 print(ap_documents)
 
 # plot_ly(data = {
@@ -398,7 +395,7 @@ print(ap_documents)
 
 # Recomendaciones
 
-1. El hecho que todos los PDT hayan tenido una correlación relativamente alta entre si (superior al 60%), enciende las alarmas de por qué Casanare es el más alejado. Este Departamento rico en petróleo atraviesa [crisis sociales](http://www.colombiainforma.info/la-crisis-que-deja-el-petroleo-en-casanare/) y [escándalos de corrupción](https://www.youtube.com/watch?v=UibMVMbO9Jk). Una hipótesis posible sería investigar si este Plan de Desarrollo contiene lineamientos que expliquen la corrupción.
+1. El hecho que todos los PDT hayan tenido una correlación relativamente alta entre si (superior al 60%), enciende las alarmas de por qué Casanare es el más alejado. Este Departamento rico en petróleo atraviesa [crisis sociales](http://www.colombiainforma.info/la-crisis-que-deja-el-petroleo-en-casanare/) y [escándalos de corrupción](https://www.youtube.com/watch?v=UibMVMbO9Jk). Una hipótesis posible sería investigar si este Plan de Desarrollo contiene lineamientos que expliquen la corrupción o rechazar esta hipótesis debido a la calidad de datos disponible. 
 2. 
 
 # Referencias
