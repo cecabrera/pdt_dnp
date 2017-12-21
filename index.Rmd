@@ -8,6 +8,23 @@ output: html_notebook
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+```
+
+Los Planes de Desarrollo Territorial (PDT) son los documentos que dan la hoja de ruta de cada Departamento de Colombia durante los 4 años de gobierno electo. Los documentos con sus contenidos textuales están disponibles [aquí](/data.zip). Putumayo es el único [plan de desarrollo](https://www.putumayo.gov.co/images/documentos/planes_y_programas/ordeN_726_16.pdf) faltante en esta base de datos.
+
+Se analizarán los siguientes puntos:
+
+1. Análisis de temas principales en cada PDT.
+2. Clasificar los planes de acuerdo con algún criterio de similitud.
+3. ¿Qué tipo de información reportaría a los evaluadores con el fin de hacer su tarea más
+sencilla?
+
+Analizar tal cantidad de datos (31 documentos y 59004 palabras) simultáneamente es una labor posible gracias a la [minería de texto](https://es.wikipedia.org/wiki/Miner%C3%ADa_de_textos). El objetivo de este blog es organizar, clasificar y visualizar los datos utilizando el lenguaje de programación [R](https://www.r-project.org/). El código fuente de este documento está alojado en [Github](https://github.com/cecabrera/pdt_dnp).
+
+Los paquetes de R necesarios para este análisis serán:
+
+```{r}
+require(shiny)
 require(data.table)
 require(tm)
 require(ggplot2)
@@ -19,31 +36,21 @@ require(tidytext)
 require(topicmodels)
 ```
 
-Los Planes de Desarrollo Departamentales son los documentos que dan la hoja de ruta de cada Departamento de Colombia durante los 4 años de gobierno que dura cada gobernador electo. Los documentos están disponibles [aquí](/data/). 
-
-Analizarlos simultáneamente es una labor posible gracias al _text analytics_. El objetivo de este blog es organizarlos, clasificarlos y visualizarlos utilizando el lenguaje de programación R. 
-
-Se analizarán los siguientes puntos:
-
-1. Análisis de temas principales en cada PDT.
-2. Clasificar los planes de acuerdo con algún criterio de similitud.
-3. ¿Qué tipo de información reportaría a los evaluadores con el fin de hacer su tarea más
-sencilla?
-
-Se identifican las fuentes de información seleccionando todos los archivos de la carpeta "data" y guardándolos en una variable llamada `paths`. Esta lista será la ruta para cargar cada Plan de Desarrollo. Los nombres de cada Departamento se almacenarán en la variable `departaments`. 
+Para comenzar, se almacena las rutas de los archivos de texto en una variable llamada `paths`. Esta lista será la ruta para cargar cada Plan de Desarrollo. Los nombres de cada Departamento se almacenarán en la variable `departaments`. 
 
 ```{r}
 paths <- list.files(c("data"), pattern="\\.(TXT|txt)$", recursive = TRUE, full.names = TRUE)
 departments <- sub(pattern = ".txt.*", "" , sub(pattern = ".*/", "", paths))
+head(paths, 5) # Visualizar los primeros 5 elementos de la variable `paths`
 ```
 
 # Preprocesamiento
 
-El preprocesamiento es un componente clave en muchos algoritmos de minado de texto _(text mining)_. El preprocesamiento usualmente se resume en tareas como tokenización, filtrado, lematización y el _stemming_ (u origen de la palabra).
+El preprocesamiento es un componente clave en muchos algoritmos de minado de texto y usualmente se resume en tareas como tokenización, filtrado, lematización y _stemming_ (o raíz de las palabras).
 
-Comenzamos cargando los datos en una sola variable llamada `d`. Son 31 documentos. Esta variable contendrá cada documento en formato de tabla. En cada tabla, las filas representan el orden en el que aparecen las palabras y las columnas contienen las palabras y un `1` para denotar que la palabra aparece una vez. Esta característica servirá a futuro cuando se agrupen las palabras. 
+Se cargan los 31 documentos datos en una sola lista llamada `d`. Cada elemento de la lista representará un Departamento y tendrá las palabras de su respectivo PDT. Se adiciona a cada palabra un `1` para denotar que la palabra aparece una vez. Este procedimiento ayudará a agrupar las frecuencias de palabras.
 
-```{r eval=FALSE}
+```{r read, eval=FALSE}
 d <- lapply(paths, function(x){
   bag = data.table(names(fread(input = x, encoding = "UTF-8")))
   setnames(x = bag, old = "V1", new = sub(pattern = ".txt.*", "" , sub(pattern = ".*/", "", x)))
@@ -55,22 +62,22 @@ names(d) <- departments
 
 ## Tokenización
 
-La tokenización consiste en separar las secuencias de caracteres en pedazos (palabras/frases) llamados tokens y, en el camino, desechar caracteres como puntuaciones. Nuestros documentos ya carecen de puntuaciones. 
+La tokenización consiste en separar las secuencias de caracteres en pedazos (palabras/frases) llamados tokens y, en el camino, desechar caracteres como puntuaciones. Nuestros documentos ya carecen de puntuaciones y están separados en su mayoría por palabras. 
 
 ## Filtrado
 
-El filtrado usualmente se hace para remover algunas de las palabras. Un filtro común es remover las _stop words_ o palabras que frecuentemente aparecen en el texto y que no contienen mucha información (es decir, preposiciones, conjunciones, etc). Así mismo, las palabras que aparecen con mucha frecuencia en un documento se dice que son de poca utilidad para distinguir otros documentos y también las palabras que aparecen rara vez posiblemente son irrelevantes y pueden ser eliminadas de los documentos. 
+Un filtro común es remover las _stop words_ o palabras que frecuentemente aparecen en el texto y que no aportan información: preposiciones y conjunciones, por citar algunas. En R, el paquete `tm` brinda una lista de 308 `stop-words` del español. Así mismo, hay palabras que aparecen con mucha frecuencia y que son irrelevantes como "ee", "nn", "oo", "aa", etc. También serán filtradas. 
 
-En R, el paquete `tm` brinda una lista de 308 `stop-words` del español. A continuación las primeras 50. 
+ A continuación las primeras 50. 
 
 ```{r}
-stop_es <- stopwords(kind = "es")
+stop_es <- c(stopwords(kind = "es"), "ee", "nn", "oo", "aa", "dd", "rr", "cc", "pp", "tt", "yy", "zz", "xx")
 print(matrix(stop_es[1:50], nrow = 10, byrow = TRUE))
 ```
 
 Las suprimimos de todos los documentos:
 
-```{r eval=FALSE}
+```{r filter, eval=FALSE}
 d <- lapply(d, function(x){
   x[!x[[1]] %in% stop_es]
 })
@@ -78,22 +85,22 @@ d <- lapply(d, function(x){
 
 ## Lematización
 
-Lematización considera el análisis morfológico de las palabras, es decir, agrupar las diversas formas de una palabra de manera que puedan ser analizadas como un solo término. En otras palabras, los métodos de lematización intentan mapear verbos a su sentido infinitivo y los sustantivos a su forma singular. Para lematizar documentos, es necesario determinar para cada palabra si es un verbo, adjetivo o sustantivo. Dado que este proceso es tedioso y sujeto a errores, en la práctica, se prefieren los métodos de _stemming_. 
+Lematización considera el análisis morfológico de las palabras: agrupar las diversas formas de una palabra de manera que puedan ser analizadas como un solo término. En otras palabras, los métodos de lematización intentan mapear verbos a su sentido infinitivo y los sustantivos a su forma singular. Para lematizar documentos, es necesario determinar para cada palabra si es un verbo, adjetivo o sustantivo. Dado que este proceso es tedioso y sujeto a errores, en la práctica, se prefieren los métodos de _stemming_. 
 
 ## Stemming
 
-Los métodos de _stemming_ le apuntan a encontrar la raíz de las palabras y usarla como método agrupador de palabras. Como es de esperarse, los algoritmos de _stemming_ son dependientes al lenguaje. 
+Los métodos de _stemming_ le apuntan a encontrar la raíz de las palabras y usarla como método agrupador de palabras. Como es de esperarse, los algoritmos de _stemming_ dependen del lenguaje. 
 
-Utilizando el algoritmo de _stemming_ de Porter y tomando como ejemplo las 30 palabras del Plan de Desarrollo del Huila encontramos las siguientes comparaciones.
+Utilizando el algoritmo de _stemming_ de Porter y tomando como ejemplo las 30 palabras más mencionadas del Plan de Desarrollo del Huila encontramos las siguientes comparaciones. 
 
 ```{r}
-d <- readRDS("chunks/chunk5.RDS")
-print(d$HUILA[1000:1030, .(HUILA, stemDocument(x = HUILA,  language = "es"))])
+d <- readRDS("chunks/filter.RDS")
+print(d$HUILA[, .N, keyby = HUILA][order(N, decreasing = T)][1:30,.(HUILA, stemDocument(x = HUILA,  language = "es"), N)])
 ```
 
 La búsqueda del origen de las palabras _(stemming)_ es un procedimiento delicado. En el español, remover las tildes en las palabras cambia el acento y puede entregar una connotación distinta a la palabra de origen: no es lo mismo "hábito" que "habito" que "habitó". A su vez, las raíces agrupan palabras de contexto diferentes: "partido", "parte", "partida" y "partes" conllevan a la misma raíz "part". Para efectos de este trabajo se utilizarán las raíces de las palabras dejando a consideración del lector las implicaciones que esto tiene. 
 
-```{r eval=FALSE}
+```{r stemm, eval=FALSE}
 d <- lapply(d, function(x){
   colname <- colnames(x)[1]
   x[[colname]] <- stemDocument(x[[colname]], language = "es")
@@ -107,8 +114,8 @@ Se definirá el _vocabulario_ como el conjunto que contiene todas las palabras p
 
 Colocamos todos los tokens en una misma matriz, se suman las frecuencias de cada palabra en cada documento y se ordenan en orden decreciente.  
 
-```{r}
-d <- readRDS("chunks/chunk7.RDS")
+```{r frequencies}
+d <- readRDS("chunks/stemm.RDS")
 d <- lapply(d, function(x){
   name <- colnames(x)[1]
   x[, depart := name]
@@ -165,15 +172,18 @@ wellPanel(
 )
 ```
 
+En los documentos está el reto de lidiar con las palabras pegadas. Por ejemplo, en Casanare hay palabras como "culturaprogram", "comunitarioprogram", "deportivosector" y "firmesector". En Arauca sucede algo similar: "propiosotr" haciendo alución a "propios otros" y "físicasecret" haciendo alución a "física secreto". Estas inconsistencias podrían dificultar la comparación entre documentos. 
 
-En VSM cada palabra es representada por una variable que contienen un valor numérico indicando el peso (importancia) de la palabra en el documento. Se utilizará el modelo de _Term frequency-inverse document frequency_ (TF-IDF). Convertimos la tabla en una matriz de frecuencias
+En el Meta está de primero la palabra "guaro". Indagando en el documento se encontró que hay un municipio llamado "San Carlos de Guaroa" y el algoritmo luego de hacer el _stemm_ suprimió la "a" al final de "Guaroa". Este municipio tiene relevancia por las intenciones del departamento en aportar a sus necesidades sociales y económicas; y no tiene nada que ver con una política hacia el aguardiente. 
+
+En VSM cada palabra es representada por un valor numérico que indica el peso (importancia) de la palabra en el documento. Se utilizará el modelo de _Term frequency-inverse document frequency_ (TF-IDF) para ponderar. Se moldea la tabla en una matriz de frecuencia:
 
 ```{r}
-f <- dcast.data.table(d, formula = "word~depart", value.var = "V1", fill = 0)
+f <- dcast.data.table(d, formula = "word ~ depart", value.var = "V1", fill = 0)
 str(f)
 ```
 
-La variable `f` contiene la frecuencia de con la que aparece la palabra de la fila en el departamento de la columna. Calculamos el término de frecuencia `TF-IDF`.
+La variable `f` contiene la frecuencia con la que aparece cada palabra para cada departamento. Se calcula el término de frecuencia `TF-IDF`:
 
 ```{r eval=FALSE}
 tf <- f[,-1,with=FALSE]
@@ -295,14 +305,14 @@ doc <- cast_dtm(data = d, document = depart, term = word, value = V1, weighting 
 print(doc)
 ```
 
-Se analizarán 2 tópicos 
+Se analizarán 2 tópicos
 
 ```{r}
 ap_lda2 <- LDA(doc, k = 2, control = list(seed = 1234))
 print(ap_lda2)
 ```
 
-Extract the per-topic-per-word probabilities, called β (“beta”), from the model.
+Se extrae las probabilidades o β (“betas”) del modelo por tópico por palabra.
 
 ```{r}
 ap_topics2 <- tidy(ap_lda2, matrix = "beta")
@@ -380,6 +390,11 @@ print(ap_documents)
 #         , x = ~document, y = ~gamma, type = "bar")
 ```
 
+# Recomendaciones
+
+1. El hecho que todos los PDT hayan tenido una correlación relativamente alta entre si (superior al 60%), enciende las alarmas de por qué Casanare es el más alejado. Este Departamento rico en petróleo atraviesa [crisis sociales](http://www.colombiainforma.info/la-crisis-que-deja-el-petroleo-en-casanare/) y [escándalos de corrupción](https://www.youtube.com/watch?v=UibMVMbO9Jk). Una hipótesis posible sería investigar si este Plan de Desarrollo contiene lineamientos que expliquen la corrupción.
+2. 
+
 # Referencias
 
 * [A Brief Survey of Text Mining: Classification, Clustering and Extraction Techniques](https://arxiv.org/pdf/1707.02919.pdf)
@@ -389,6 +404,4 @@ print(ap_documents)
 * [DNP destacó los planes de desarrollo departamentales](http://www.portafolio.co/economia/gobierno/dnp-destaco-los-planes-de-desarrollo-departamentales-501057) 
 * [Text Mining with R](https://www.tidytextmining.com/topicmodeling.html)
 
-# Código fuente
 
-Código fuente disponible en [Github](https://github.com/cecabrera/pdt_dnp).
