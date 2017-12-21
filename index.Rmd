@@ -23,7 +23,7 @@ Analizar tal cantidad de datos (31 documentos y 59004 palabras) simultáneamente
 
 Los paquetes de R necesarios para este análisis serán:
 
-```{r, warning=FALSE}
+```{r, warning=FALSE, message=FALSE}
 require(shiny)
 require(data.table)
 require(tm)
