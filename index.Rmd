@@ -41,10 +41,10 @@ Para comenzar, se almacena las rutas de los archivos de texto en una variable ll
 ```{r}
 paths <- list.files(c("data"), pattern="\\.(TXT|txt)$", recursive = TRUE, full.names = TRUE)
 departments <- sub(pattern = ".txt.*", "" , sub(pattern = ".*/", "", paths))
-head(paths, 5) # Visualizar los primeros 5 elementos de la variable `paths`
+print(head(paths, 5)) # Visualizar los primeros 5 elementos de la variable `paths`
 ```
 
-# Preprocesamiento
+## Preprocesamiento
 
 El preprocesamiento es un componente clave en muchos algoritmos de minado de texto y usualmente se resume en tareas como tokenización, filtrado, lematización y _stemming_ (o raíz de las palabras).
 
@@ -60,11 +60,11 @@ d <- lapply(paths, function(x){
 names(d) <- departments
 ```
 
-## Tokenización
+### Tokenización
 
 La tokenización consiste en separar las secuencias de caracteres en pedazos (palabras/frases) llamados tokens y, en el camino, desechar caracteres como puntuaciones. Nuestros documentos ya carecen de puntuaciones y están separados en su mayoría por palabras. 
 
-## Filtrado
+### Filtrado
 
 Un filtro común es remover las _stop words_ o palabras que frecuentemente aparecen en el texto y que no aportan información: preposiciones y conjunciones, por citar algunas. En R, el paquete `tm` brinda una lista de 308 `stop-words` del español. Así mismo, hay palabras que aparecen con mucha frecuencia y que son irrelevantes como "ee", "nn", "oo", "aa", etc. También serán filtradas. 
 
@@ -83,11 +83,11 @@ d <- lapply(d, function(x){
 })
 ```
 
-## Lematización
+### Lematización
 
 Lematización considera el análisis morfológico de las palabras: agrupar las diversas formas de una palabra de manera que puedan ser analizadas como un solo término. En otras palabras, los métodos de lematización intentan mapear verbos a su sentido infinitivo y los sustantivos a su forma singular. Para lematizar documentos, es necesario determinar para cada palabra si es un verbo, adjetivo o sustantivo. Dado que este proceso es tedioso y sujeto a errores, en la práctica, se prefieren los métodos de _stemming_. 
 
-## Stemming
+### Stemming
 
 Los métodos de _stemming_ le apuntan a encontrar la raíz de las palabras y usarla como método agrupador de palabras. Como es de esperarse, los algoritmos de _stemming_ dependen del lenguaje. 
 
@@ -108,7 +108,9 @@ d <- lapply(d, function(x){
 })
 ```
 
-# Modelo de Vectores Espaciales
+# Análisis Univariado
+
+## Modelo de Vectores Espaciales
 
 Se definirá el _vocabulario_ como el conjunto que contiene todas las palabras presentes en todos los documentos. La manera más común de representar a todos los documentos es convirtiéndolos en vectores numéricos. A esta representación se le llama "Modelo de Vectores Espaciales" (VSM) y es utilizada en algoritmos de minado de texto y sistemas de recolección de información; al tiempo que facilita análisis eficientes de grandes colecciones de documentos. 
 
@@ -185,7 +187,7 @@ str(f)
 
 La variable `f` contiene la frecuencia con la que aparece cada palabra para cada departamento. Se calcula el término de frecuencia `TF-IDF`:
 
-```{r weights, eval=FALSE}
+```{r weight, eval=FALSE}
 tf <- f[,-1,with=FALSE]
 idf <- log((ncol(f)-1)/rowSums(tf))
 q <- tf*idf
@@ -194,8 +196,8 @@ q_melted <- melt.data.table(cbind(word = f$word, q), id.vars = "word", variable.
 ```
 
 ```{r echo=FALSE}
-q <- readRDS("chunks/weights_q.RDS")
-q_melted <- readRDS("chunks/weights_q_melted.RDS")
+q <- readRDS("chunks/weight_q.RDS")
+q_melted <- readRDS("chunks/weight_q_melted.RDS")
 ```
 
 La variable `q` contiene la frecuencia ponderada por el TF-IDF. La variable `q_melted` es la misma variable `q` reducida en 3 columnas. A continuación las palabras más relevantes de cada departamento luego de ponderar por TF-IDF.
@@ -248,6 +250,10 @@ wellPanel(
 
 ```
 
+# Análisis Multivariado
+
+## Algoritmos de similaridad
+
 Las [4 métricas](https://stats.stackexchange.com/questions/289400/quantify-the-similarity-of-bags-of-words) de similaridad más utilidades en la literatura son:
 
 * Jaccard Similarity
@@ -256,6 +262,8 @@ Las [4 métricas](https://stats.stackexchange.com/questions/289400/quantify-the-
 * Pearson chi2 test-based
 
 Según [Kilgarriff (1997)](http://www.aclweb.org/anthology/W/W97/W97-0122.pdf), el test ideal para calcular la similaridad entre dos documentos es el _Pearson chi2 test-based_. Sin embargo, el poder computacional y concepto teórico es significativamente superior a utilizar _Cosine Similarity_ y entregan resultados relativamente similares. El _Cosine Similarity_ ha demostrado en otros experimentos ser mejor que el _Spearman's rank correlation_; aún cuando es una alternativa viable para calcular la similaridad entre documentos. La _Jaccard Similarity_ es la más simple de las similaridades y no tiene en consideración la frecuencia con la que aparecen las palabras. Por esta razón, la similaridad a trabajar será el _Cosine Similarity_.
+
+## Correlación
 
 Cada Plan de Desarrollo se puede representar como un __vector__ de valores. El coseno entre dos vectores determina cuán cercanos (igual a 1) o alejados (igual a -1) están en el plano n-dimensional. El cálculo del coseno es considerado también como el [_coeficiente de correlación no centrado_](https://en.wikipedia.org/wiki/Pearson_correlation_coefficient) entre dos vectores y matemáticamente es similar al coeficiente de correlación de Pearson. Por eso se usará este como medida de la similaridad. 
 
@@ -266,10 +274,10 @@ corrplot(corr = cor(q, method = "pearson"), type = "lower", method = "pie", diag
 La matriz de correlación se ordenó por compomentes principales y por eso aparecen primero los departamentos con mayor correlación y de último los de menos. Se resalta los siguientes insights:
 
 * Quindío y Cundinamarca tienen la mayor similitud (0.903) de palabras en los Planes de Desarrollo. 
-* Casanare es el departamento con mayor diferencias respecto a los demás departamentos.
+* Casanare es el departamento con mayor diferencias respecto a los demás departamentos. Esto puede deberse a las uniones de palabras en una sola o a diferentes reales en el contenido del documento. 
 * [En Octubre de 2016](http://www.portafolio.co/economia/gobierno/dnp-destaco-los-planes-de-desarrollo-departamentales-501057), el DNP entregó un reconocimiento a las gobernaciones con desarrollo robusto, intermedio y temprano a Antioquia, Nariño y Caquetá, respectivamente. En el correlograma, estas tres aparecen seguidas infiriendo esta aparente similitud. 
 
-# Clasificación
+## Clasificación/Conglomerados
 
 Si cada documento hiciese parte de una categoría _a priori_, se utilizarían algorirmos como:
 
@@ -278,36 +286,34 @@ Si cada documento hiciese parte de una categoría _a priori_, se utilizarían al
 3. Máquinas de Vectores de Soporte
 4. Clasificador Naive Bayes
 
-Un caso podría ser categorizar los documentos por región del país, tomar los Planes de Desarrollo Municipales y tratar de clasificar si las palabras usadas en los Municipios están correlacionadas (son similares) a las palabras usandas en los Departamentos. 
+Un caso podría ser categorizar los documentos por región del país, tomar los Planes de Desarrollo Municipales y desarrollar un algoritmo de aprendizaje automático _(machine learning)_ para clasificar si las palabras usadas en los Municipios están correlacionadas (son similares) a las palabras usandas en los Departamentos. 
 
-En vista que la clasificación se hará _a posteriori_, se utilizarán algoritmos de _clustering_ o conglomerados. En Analítica de Texto algunos son:
+En vista que la clasificación se hará _a posteriori_, se utilizarán algoritmos de _clustering_ o conglomerados. En Minería de Texto algunos populares son:
 
 1. Algortimos de Conglomerados Herárquicos. 
 2. Conglomerado k-medias
 3. Conglomerados probabilísticos y Modelos de Tópicos
 
-Los algoritmos de conglomerados herárquicos están basados en distancias. Utilizan una función de similaridad para medir cuán cerca está un documento de otro. Es posible contruirlos de arriba-a-abajo (colocando cada documento en un grupo) o de abajo-a-arriba (colocando todos los documentos en un grupo). Los algoritmos de k-medias ubican un centroide por cada grupo y conglomera cada documento respecto a cada centroide. Es ampliamente utilizado en problemas de datos estructurados. El cálculo del número óptimo de grupos (k) es considerado _NP-Hard_ dados los requerimientos computacionales para calcularlo. 
+Los algoritmos de conglomerados herárquicos están basados en distancias respecto a cada vector. Utilizan una función de similaridad para medir cuán cerca está un documento de otro. Es posible contruirlos de arriba-a-abajo (colocando cada documento en un grupo) o de abajo-a-arriba (colocando todos los documentos en un grupo). Los algoritmos de k-medias ubican un centroide por cada grupo y conglomera cada documento respecto a su cercanía a un centroide. Es ampliamente utilizado en problemas de datos estructurados. El cálculo del número óptimo de grupos (k) es considerado _NP-Hard_ dados los requerimientos computacionales para calcularlo y por eso existen heurísticas para hallar un óptimo local. 
 
-La mayor implicación en los algoritmos anteriores es que a cada "observación" (en nuestro caso "palabra") es asignado a una única categoría. Sin embargo, existen palabras que podrían hacer parte de varias categorías (o "tópicos"). Por eso, el modelaje de tópicos será el escogido para clasificar los Planes de Desarrollo Departamentales.
+La mayor implicación en los algoritmos anteriores es que a cada "observación" (en nuestro caso "palabra") es asignado a una única categoría. Sin embargo, como sucede en el lenguaje natural, existen palabras que podrían hacer parte de varias categorías (o tópicos/temas). Por eso, el modelaje de tópicos será el escogido para clasificar los Planes de Desarrollo Departamentales.
 
-# Modelaje de tópicos
+### Modelaje de tópicos
 
-Topic modeling is a method for unsupervised classification of such documents, similar to clustering on numeric data, which finds natural groups of items even when we’re not sure what we’re looking for.
+El modelaje de tópicos es un método de clasificación no-supervisada utilizado para encuentrar grupos naturales de palabras que aparentemente no tienen relación. 
 
-Latent Dirichlet allocation (LDA) is a particularly popular method for fitting a topic model. It treats each document as a mixture of topics, and each topic as a mixture of words. This allows documents to “overlap” each other in terms of content, rather than being separated into discrete groups, in a way that mirrors typical use of natural language.
+### Asignación de Dirichlet Latente
 
-## Asignación de Dirichlet Latente
+La Alocación de Dirichlet Latente (LDA) es particularmente popular para encajar un modelo de tópicos. Toma cada documento como una mezcla de tópicos, y a cada tópcio como una mezcla de palabras. Esto permite que una palabra pueda hacer parte de varios tópicos.
 
-LDA is a mathematical method for estimating both of these at the same time: finding the mixture of words that is associated with each topic, while also determining the mixture of topics that describes each document. There are a number of existing implementations of this algorithm, and we’ll explore one of them in depth.
+Matemáticamente, este método estima simultáneamente la mezcla de palabras que están asociadas con cada tópico, al tiempo que identifica la mezcla de tópicos que describen cada documento.
+
+Se convierte la variable a un formato apto para realizar el cálculo del LDA. Se analizarán 2 tópicos potenciales para entender el contenido de palabras en cada uno. 
 
 ```{r}
 doc <- cast_dtm(data = d, document = depart, term = word, value = V1, weighting = tm::weightTf)
 print(doc)
-```
 
-Se analizarán 2 tópicos
-
-```{r}
 ap_lda2 <- LDA(doc, k = 2, control = list(seed = 1234))
 print(ap_lda2)
 ```
