@@ -2,8 +2,8 @@
 title: "Clasificación de Planes de Desarrollo"
 author: "Camilo Cabrera"
 date: "December 21, 2017"
-output: html_notebook
 runtime: shiny
+output: html_notebook
 ---
 
 ```{r setup, include=FALSE}
@@ -12,6 +12,11 @@ require(data.table)
 require(tm)
 require(ggplot2)
 require(corrplot)
+require(tidyr)
+require(ggplot2)
+require(dplyr)
+require(tidytext)
+require(topicmodels)
 ```
 
 Los Planes de Desarrollo Departamentales son los documentos que dan la hoja de ruta de cada Departamento de Colombia durante los 4 años de gobierno que dura cada gobernador electo. Los documentos están disponibles [aquí](/data/). 
@@ -24,8 +29,6 @@ Se analizarán los siguientes puntos:
 2. Clasificar los planes de acuerdo con algún criterio de similitud.
 3. ¿Qué tipo de información reportaría a los evaluadores con el fin de hacer su tarea más
 sencilla?
-
-
 
 Se identifican las fuentes de información seleccionando todos los archivos de la carpeta "data" y guardándolos en una variable llamada `paths`. Esta lista será la ruta para cargar cada Plan de Desarrollo. Los nombres de cada Departamento se almacenarán en la variable `departaments`. 
 
@@ -71,7 +74,6 @@ Las suprimimos de todos los documentos:
 d <- lapply(d, function(x){
   x[!x[[1]] %in% stop_es]
 })
-saveRDS(d, "chunks/chunk5.RDS")
 ```
 
 ## Lematización
@@ -97,7 +99,6 @@ d <- lapply(d, function(x){
   x[[colname]] <- stemDocument(x[[colname]], language = "es")
   x
 })
-saveRDS(d, "chunks/chunk7.RDS")
 ```
 
 # Modelo de Vectores Espaciales
@@ -118,7 +119,7 @@ d <- rbindlist(d, use.names = T)[, sum(f), keyby = .(depart, word)]
 print(d)
 ```
 
-Filtra por los departamentos. Cada departamento resalta las 15 palabras (raíces) más mencionadas. 
+Filtra por los departamentos. Cada departamento resalta las 15 palabras (raíces) más mencionadas en cada Plan de Desarrollo. 
 
 ```{r echo=FALSE}
 wellPanel(
@@ -128,17 +129,10 @@ wellPanel(
       choices = departments, selected = "CASANARE", multiple = F)
       
     , renderPlot(expr ={
-        ggplot(data = {
-            temp <- head(d[depart %in% input$depart1][order(V1, decreasing = T)], 15)
-            temp$word <- factor(temp$word, levels = rev(unique(temp$word)))
-            temp
-          }, aes(word, V1, fill = depart)
-          ) +
-          geom_col(show.legend = FALSE) +
-          labs(x = NULL, y = "frecuencia") +
+        ggplot(data = d %>% filter(depart %in% input$depart1) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
+          geom_col(show.legend = FALSE) + labs(x = NULL, y = "frecuencia") +
           # facet_wrap(~depart, ncol = 2, scales = "free") +
-          coord_flip() + 
-          scale_fill_manual(values=c("#CC6666", "#9999CC", "#66CC99"))
+          coord_flip() + scale_fill_manual(values=c("#CC6666", "#9999CC", "#66CC99"))
     })
 
     )
@@ -146,12 +140,7 @@ wellPanel(
     , selectInput("depart2", label = "Selecciona el departamento:",
       choices = departments, selected = "CUNDINAMARCA", multiple = F)
     , renderPlot(
-      ggplot(data = {
-          temp <- head(d[depart %in% input$depart2][order(V1, decreasing = T)], 15)
-          temp$word <- factor(temp$word, levels = rev(unique(temp$word)))
-          temp
-        }, aes(word, V1, fill = depart)
-        ) +
+        ggplot(data = d %>% filter(depart %in% input$depart2) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
         geom_col(show.legend = FALSE) +
         labs(x = NULL, y = "frecuencia") +
         # facet_wrap(~depart, ncol = 2, scales = "free") +
@@ -163,12 +152,7 @@ wellPanel(
     , selectInput("depart3", label = "Selecciona el departamento:",
     choices = departments, selected = "ANTIOQUIA", multiple = F)
     , renderPlot(
-      ggplot(data = {
-          temp <- head(d[depart %in% input$depart3][order(V1, decreasing = T)], 15)
-          temp$word <- factor(temp$word, levels = rev(unique(temp$word)))
-          temp
-        }, aes(word, V1, fill = depart)
-        ) +
+        ggplot(data = d %>% filter(depart %in% input$depart3) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
         geom_col(show.legend = FALSE) +
         labs(x = NULL, y = "frecuencia") +
         # facet_wrap(~depart, ncol = 2, scales = "free") +
@@ -214,12 +198,7 @@ wellPanel(
       choices = departments, selected = "CASANARE", multiple = F)
       
     , renderPlot(
-      ggplot(data = {
-          temp <- head(q_melted[depart %in% input$depart4][order(V1, decreasing = T)], 15)
-          temp$word <- factor(temp$word, levels = rev(unique(temp$word)))
-          temp
-        }, aes(word, V1, fill = depart)
-        ) +
+        ggplot(data = d %>% filter(depart %in% input$depart4) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
         geom_col(show.legend = FALSE) +
         labs(x = NULL, y = "TF-IDF") +
         # facet_wrap(~depart, ncol = 2, scales = "free") +
@@ -232,12 +211,7 @@ wellPanel(
     , selectInput("depart5", label = "Selecciona el departamento:",
       choices = departments, selected = "CUNDINAMARCA", multiple = F)
     , renderPlot(
-      ggplot(data = {
-          temp <- head(d[depart %in% input$depart5][order(V1, decreasing = T)], 15)
-          temp$word <- factor(temp$word, levels = rev(unique(temp$word)))
-          temp
-        }, aes(word, V1, fill = depart)
-        ) +
+        ggplot(data = d %>% filter(depart %in% input$depart5) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
         geom_col(show.legend = FALSE) +
         labs(x = NULL, y = "TF-IDF") +
         # facet_wrap(~depart, ncol = 2, scales = "free") +
@@ -249,12 +223,7 @@ wellPanel(
     , selectInput("depart6", label = "Selecciona el departamento:",
     choices = departments, selected = "ANTIOQUIA", multiple = F)
     , renderPlot(
-      ggplot(data = {
-          temp <- head(d[depart %in% input$depart6][order(V1, decreasing = T)], 15)
-          temp$word <- factor(temp$word, levels = rev(unique(temp$word)))
-          temp
-        }, aes(word, V1, fill = depart)
-        ) +
+        ggplot(data = d %>% filter(depart %in% input$depart6) %>% mutate(word = reorder(word, V1)) %>% top_n(15, V1), aes(word, V1, fill = depart)) +
         geom_col(show.legend = FALSE) +
         labs(x = NULL, y = "TF-IDF") +
         # facet_wrap(~depart, ncol = 2, scales = "free") +
@@ -299,17 +268,117 @@ Si cada documento hiciese parte de una categoría _a priori_, se utilizarían al
 3. Máquinas de Vectores de Soporte
 4. Clasificador Naive Bayes
 
-Para clasificar nuevos documentos. Un caso podría ser categorizar los documentos por región del país, tomar los Planes de Desarrollo Municipales y tratar de clasificar si las palabras usadas en los Municipios están correlacionadas (son similares) a las palabras usandas en los Departamentos. 
+Un caso podría ser categorizar los documentos por región del país, tomar los Planes de Desarrollo Municipales y tratar de clasificar si las palabras usadas en los Municipios están correlacionadas (son similares) a las palabras usandas en los Departamentos. 
 
 En vista que la clasificación se hará _a posteriori_, se utilizarán algoritmos de _clustering_ o conglomerados. En Analítica de Texto existen:
 
-1. Algortimos de Conglomerados Herárquicos
+1. Algortimos de Conglomerados Herárquicos. 
 2. Conglomerado k-medias
 3. Conglomerados probabilísticos y Modelos de Tópicos
 
+Los algoritmos de conglomerados herásquicos están basados en distancias. Utilizan una función de similaridad para medir cuán cerca está un documento de otro. Es posible contruirlos en de arriba-a-abajo (colocando cada documento en un grupo) o de abajo-a-arriba (colocando todos los documentos en un grupo). Los algoritmos de k-medias ubican un centroide por cada grupo y conglomera cada documento respecto a cada centroide. Es ampliamente utilizado en problemas de datos estructurados. El cálculo del número óptimo de grupos (k) es considerado _NP-Hard_ dados los requerimientos computacionales para calcularlo. 
+
+La mayor implicación en los algoritmos anteriores es que a cada "observación" (en nuestro caso "palabra") le asigna una única categoría. Sin embargo, existen palabras que podrían hacer parte de varias categorías (o "tópicos"). Por eso, el modelaje de tópicos será el escogido para clasificar los Planes de Desarrollo Departamentales.
+
+# Modelaje de tópicos
+
+Topic modeling is a method for unsupervised classification of such documents, similar to clustering on numeric data, which finds natural groups of items even when we’re not sure what we’re looking for.
+
+Latent Dirichlet allocation (LDA) is a particularly popular method for fitting a topic model. It treats each document as a mixture of topics, and each topic as a mixture of words. This allows documents to “overlap” each other in terms of content, rather than being separated into discrete groups, in a way that mirrors typical use of natural language.
+
+## Asignación de Dirichlet Latente
+
+LDA is a mathematical method for estimating both of these at the same time: finding the mixture of words that is associated with each topic, while also determining the mixture of topics that describes each document. There are a number of existing implementations of this algorithm, and we’ll explore one of them in depth.
+
+```{r}
+doc <- cast_dtm(data = d, document = depart, term = word, value = V1, weighting = tm::weightTf)
+print(doc)
+```
+
+Se analizarán 2 tópicos 
+
+```{r}
+ap_lda2 <- LDA(doc, k = 2, control = list(seed = 1234))
+print(ap_lda2)
+```
+
+Extract the per-topic-per-word probabilities, called β (“beta”), from the model.
+
+```{r}
+ap_topics2 <- tidy(ap_lda2, matrix = "beta")
+print(ap_topics2)
+```
+
+Notice that this has turned the model into a one-topic-per-term-per-row format. For each combination, the model computes the probability of that term being generated from that topic. For example, the term “aaron” has a  
+1.686917×10−12 1.686917×10−12  probability of being generated from topic 1, but a  3.8959408×10−
+53.8959408×10−5 probability of being generated from topic 2.
+
+```{r}
+ap_top_terms2 <- ap_topics2 %>%
+  group_by(topic) %>%
+  top_n(15, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+
+ap_top_terms2 %>%
+  mutate(term = reorder(term, beta)) %>%
+  ggplot(aes(term, beta, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip()
+
+```
 
 
-Se agruparán los documentos en tópicos en función de las palabras y su presencia en cada documento. 
+This visualization lets us understand the two topics that were extracted from the articles. The most common words in topic 1 include “percent”, “million”, “billion”, and “company”, which suggests it may represent business or financial news. Those most common in topic 2 include “president”, “government”, and “soviet”, suggeting that this topic represents political news. One important observation about the words in each topic is that some words, such as “new” and “people”, are common within both topics. This is an advantage of topic modeling as opposed to “hard clustering” methods: topics used in natural language could have some overlap in terms of words.
+
+As an alternative, we could consider the terms that had the greatest difference in  
+β
+β  between topic 1 and topic 2. This can be estimated based on the log ratio of the two:  
+log
+2
+(
+β
+2
+β
+1
+)
+log2a(β2β1)  (a log ratio is useful because it makes the difference symmetrical:  
+β
+2
+β2  being twice as large leads to a log ratio of 1, while  
+β
+1
+β1  being twice as large results in -1). To constrain it to a set of especially relevant words, we can filter for relatively common words, such as those that have a β  greater than 1/1000 in at least one topic.
+
+```{r}
+beta_spread2 <- ap_topics2 %>%
+  mutate(topic = paste0("topic", topic)) %>%
+  spread(topic, beta) %>%
+  filter(topic1 > .001 | topic2 > .001) %>%
+  mutate(log_ratio = log2(topic2 / topic1))
+
+beta_spread2 %>%
+  mutate(term = reorder(term, log_ratio)) %>%
+  filter(abs(log_ratio) > 4) %>%
+  ggplot(aes(term, log_ratio)) +
+  geom_col(show.legend = FALSE) + 
+  coord_flip()
+```
+
+# Document-topic probabilities
+
+```{r}
+ap_documents <- tidy(ap_lda2, matrix = "gamma")
+print(ap_documents)
+
+plot_ly(data = {
+  
+          temp <- as.data.table(ap_documents)[topic %in% "1"][order(gamma)]
+          
+}
+        , x = ~document, y = ~gamma, type = "bar")
+```
 
 # Referencias
 
@@ -318,3 +387,18 @@ Se agruparán los documentos en tópicos en función de las palabras y su presen
 * [Quantify the similarity of bags of words](https://stats.stackexchange.com/questions/289400/quantify-the-similarity-of-bags-of-words)
 * [Pearson Correlation Coefficient](https://en.wikipedia.org/wiki/Pearson_correlation_coefficient)
 * [DNP destacó los planes de desarrollo departamentales](http://www.portafolio.co/economia/gobierno/dnp-destaco-los-planes-de-desarrollo-departamentales-501057) 
+* [Text Mining with R](https://www.tidytextmining.com/topicmodeling.html)
+
+# Código fuente
+
+Código fuente disponible en [Github](https://github.com/cecabrera/pdt_dnp).
+
+```{r}
+
+
+
+tid(yAssociatedPress) %>%
+  filter(document == 6) %>%
+  arrange(desc(count))
+
+```
